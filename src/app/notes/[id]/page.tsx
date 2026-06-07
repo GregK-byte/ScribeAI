@@ -1,0 +1,28 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import NoteDetailClient from "./NoteDetailClient";
+import { supabaseAdmin } from "@/lib/supabase";
+
+interface PageProps {
+  params: { id: string };
+}
+
+export default async function NoteDetailPage({ params }: PageProps) {
+  const { userId } = await auth();
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  const { data: note, error } = await supabaseAdmin
+    .from("notes")
+    .select("*")
+    .eq("id", params.id)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !note) {
+    redirect("/dashboard");
+  }
+
+  return <NoteDetailClient note={note} />;
+}
