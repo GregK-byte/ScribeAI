@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { openai } from "@/lib/openai";
 import { uploadAudioToS3 } from "@/lib/s3";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdminSingleton } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sb = getSupabaseAdminSingleton();
+    if (!sb) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     }
 
     const formData = await request.formData();
@@ -41,7 +46,7 @@ export async function POST(request: NextRequest) {
     const transcript = transcription.text;
 
     // Save transcript to Supabase as a draft note
-    const { data: note, error } = await supabaseAdmin
+    const { data: note, error } = await sb
       .from("notes")
       .insert({
         user_id: userId,

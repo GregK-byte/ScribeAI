@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import NoteDetailClient from "./NoteDetailClient";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdminSingleton } from "@/lib/supabase";
 
 interface PageProps {
   params: { id: string };
@@ -13,7 +13,12 @@ export default async function NoteDetailPage({ params }: PageProps) {
     redirect("/sign-in");
   }
 
-  const { data: note, error } = await supabaseAdmin
+  const sb = getSupabaseAdminSingleton();
+  if (!sb) {
+    redirect("/dashboard");
+  }
+
+  const { data: note, error } = await sb
     .from("notes")
     .select("*")
     .eq("id", params.id)

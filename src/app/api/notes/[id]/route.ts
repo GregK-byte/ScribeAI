@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdminSingleton } from "@/lib/supabase";
+
+function getSB() {
+  const sb = getSupabaseAdminSingleton();
+  if (!sb) throw new Error("Database not configured");
+  return sb;
+}
 
 export async function GET(
   request: NextRequest,
@@ -12,7 +18,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: note, error } = await supabaseAdmin
+    const sb = getSB();
+    const { data: note, error } = await sb
       .from("notes")
       .select("*")
       .eq("id", params.id)
@@ -42,15 +49,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const sb = getSB();
     const body = await request.json();
     const { title, soap_note, transcript } = body;
 
-    const updateData: any = { updated_at: new Date().toISOString() };
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
     if (title !== undefined) updateData.title = title;
     if (soap_note !== undefined) updateData.soap_note = soap_note;
     if (transcript !== undefined) updateData.transcript = transcript;
 
-    const { data: note, error } = await supabaseAdmin
+    const { data: note, error } = await sb
       .from("notes")
       .update(updateData)
       .eq("id", params.id)
@@ -81,7 +89,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { error } = await supabaseAdmin
+    const sb = getSB();
+    const { error } = await sb
       .from("notes")
       .delete()
       .eq("id", params.id)

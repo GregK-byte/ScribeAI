@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdminSingleton } from "@/lib/supabase";
 
-// Dynamic import for jsPDF (it's a client-side library but works in server env too)
+function getSB() {
+  const sb = getSupabaseAdminSingleton();
+  if (!sb) throw new Error("Database not configured");
+  return sb;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -13,7 +18,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: note, error } = await supabaseAdmin
+    const sb = getSB();
+    const { data: note, error } = await sb
       .from("notes")
       .select("*")
       .eq("id", params.id)
@@ -26,8 +32,6 @@ export async function GET(
 
     // Generate PDF using jsPDF on the server
     const { jsPDF } = await import("jspdf");
-    // @ts-ignore
-    const autoTable = (await import("jspdf-autotable")).default;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -35,7 +39,7 @@ export async function GET(
     // Title
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text(note.title, pageWidth / 2, 20, { align: "center" });
+    doc.text(note.title || "Untitled Note", pageWidth / 2, 20, { align: "center" });
 
     // Date
     doc.setFontSize(10);
@@ -57,21 +61,22 @@ export async function GET(
     doc.text(lines, 14, 44);
 
     // Transcript (if exists)
+    let cursorY = 44 + lines.length * 5 + 20;
+
     if (note.transcript) {
-      const transcriptY = (doc as any).lastAutoTable?.finalY || 44 + lines.length * 5 + 20;
-      
-      if (transcriptY > 250) {
+      if (cursorY > 250) {
         doc.addPage();
+        cursorY = 20;
       }
 
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.text("Original Transcript", 14, transcriptY > 250 ? 20 : transcriptY + 20);
+      doc.text("Original Transcript", 14, cursorY);
 
       doc.setFontSize(10);
       doc.setFont("courier", "normal");
       const transLines = doc.splitTextToSize(note.transcript, pageWidth - 28);
-      doc.text(transLines, 14, transcriptY > 250 ? 30 : transcriptY + 30);
+      doc.text(transLines, 14, cursorY + 10);
     }
 
     // Footer
@@ -93,7 +98,7 @@ export async function GET(
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${note.title.replace(/\s+/g, "_")}_SOAP_Note.pdf"`,
+        "Content-Disposition": `attachment; filename="${(note.title || "SOAP_Note").replace(/\s+/g, "_")}.pdf"`,
         "Content-Length": pdfBuffer.length.toString(),
       },
     });

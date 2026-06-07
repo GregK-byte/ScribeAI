@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { anthropic, SOAP_SYSTEM_PROMPT } from "@/lib/anthropic";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdminSingleton } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sb = getSupabaseAdminSingleton();
+    if (!sb) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     }
 
     const { transcript, noteId, title } = await request.json();
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Update the note in Supabase
     if (noteId) {
-      const { error } = await supabaseAdmin
+      const { error } = await sb
         .from("notes")
         .update({
           soap_note: soapNote,

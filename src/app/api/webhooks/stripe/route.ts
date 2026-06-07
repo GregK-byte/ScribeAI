@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, TRIAL_PERIOD_DAYS } from "@/lib/stripe";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdminSingleton } from "@/lib/supabase";
+
+function getSB() {
+  const sb = getSupabaseAdminSingleton();
+  if (!sb) throw new Error("Database not configured");
+  return sb;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +27,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const sb = getSB();
+
     // Handle the event
     switch (event.type) {
       case "checkout.session.completed": {
@@ -29,8 +37,7 @@ export async function POST(request: NextRequest) {
         const subscriptionId = session.subscription as string;
 
         if (userId && subscriptionId) {
-          // Store subscription reference in Supabase
-          await supabaseAdmin.from("subscriptions").upsert({
+          await sb.from("subscriptions").upsert({
             user_id: userId,
             stripe_subscription_id: subscriptionId,
             status: "active",
@@ -52,7 +59,7 @@ export async function POST(request: NextRequest) {
         const userId = subscription.metadata?.userId;
 
         if (userId) {
-          await supabaseAdmin
+          await sb
             .from("subscriptions")
             .update({ status: "canceled" })
             .eq("user_id", userId);

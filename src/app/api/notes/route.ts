@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdminSingleton } from "@/lib/supabase";
+
+function getSB() {
+  const sb = getSupabaseAdminSingleton();
+  if (!sb) throw new Error("Database not configured");
+  return sb;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +15,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: notes, error } = await supabaseAdmin
+    const sb = getSB();
+    const { data: notes, error } = await sb
       .from("notes")
       .select("id, title, status, created_at, updated_at")
       .eq("user_id", userId)
@@ -36,13 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const sb = getSB();
     const { title, transcript, soap_note } = await request.json();
 
     if (!title) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    const { data: note, error } = await supabaseAdmin
+    const { data: note, error } = await sb
       .from("notes")
       .insert({
         user_id: userId,
